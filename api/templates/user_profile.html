@@ -149,28 +149,37 @@
 
                 <!-- Actions -->
                 <div class="flex flex-col gap-3">
+                    <!-- Instagram: Always Visible -->
+                    {% if target_profile.instagram_handle %}
+                    <a href="https://instagram.com/{{ target_profile.instagram_handle|cut:'@' }}" target="_blank" class="w-full bg-[#E1306C]/20 border border-[#E1306C]/40 text-white font-bold py-3 rounded-2xl hover:bg-[#E1306C]/30 transition-all flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(225,48,108,0.2)]">
+                        <span class="material-symbols-outlined">photo_camera</span>
+                        انستقرام: @{{ target_profile.instagram_handle }}
+                    </a>
+                    {% endif %}
+
+                    <!-- WhatsApp: Needs Connection -->
                     {% if connection and connection.status == 'ACCEPTED' %}
-                        {% if target_profile.instagram_handle %}
-                        <a href="https://instagram.com/{{ target_profile.instagram_handle|cut:'@' }}" target="_blank" class="w-full bg-[#E1306C]/20 border border-[#E1306C]/40 text-white font-bold py-3 rounded-2xl hover:bg-[#E1306C]/30 transition-all flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(225,48,108,0.2)]">
-                            <span class="material-symbols-outlined">photo_camera</span>
-                            @{{ target_profile.instagram_handle }}
+                        {% if target_profile.phone_number %}
+                        <a href="https://wa.me/{{ target_profile.phone_number|cut:' ' }}" target="_blank" class="w-full bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] font-bold py-3 rounded-2xl hover:bg-[#25D366]/30 transition-all flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(37,211,102,0.2)]">
+                            <span class="material-symbols-outlined">chat</span>
+                            تواصل عبر واتساب
                         </a>
                         {% endif %}
                         <button class="w-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold py-3 rounded-2xl cursor-default flex items-center justify-center gap-2">
                             <span class="material-symbols-outlined">check_circle</span>
-                            متصلين
+                            متصلين (واتساب)
                         </button>
                     {% elif connection and connection.status == 'PENDING' %}
                         <button class="w-full bg-white/5 border border-white/10 text-on-surface-variant font-bold py-4 rounded-2xl cursor-default flex items-center justify-center gap-2">
                             <span class="material-symbols-outlined animate-pulse">hourglass_top</span>
-                            بانتظار الموافقة...
+                            بانتظار الموافقة على الواتساب...
                         </button>
                     {% else %}
                         <form action="{% url 'send-connection' target_profile.user.id %}" method="POST">
                             {% csrf_token %}
                             <button type="submit" class="w-full bg-primary-container text-on-primary font-bold py-4 rounded-2xl neon-glow hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2">
-                                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person_add</span>
-                                طلب اتصال لرؤية الانستجرام
+                                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add_call</span>
+                                طلب اتصال واتساب
                             </button>
                         </form>
                     {% endif %}
