@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html class="dark" lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Radar - الإعدادات</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Geist:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <style>
+        * { font-family: 'Tajawal', 'Geist', sans-serif; }
+        body {
+            background-color: #0d1515;
+            color: #dce4e4;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .glass-card {
+            background: rgba(25, 33, 34, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .neon-glow {
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        @keyframes heartbeat {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(0, 242, 255, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 242, 255, 0); }
+        }
+        .animate-heartbeat {
+            animation: heartbeat 2s infinite;
+        }
+
+        .input-dark {
+            background: #192122 !important;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e1fdff !important;
+            transition: all 0.3s;
+        }
+        .input-dark:focus {
+            border-color: #00f2ff;
+            box-shadow: 0 0 10px rgba(0, 242, 255, 0.2);
+            outline: none;
+            background: #232b2c !important;
+        }
+        /* منع تغير اللون عند التعبئة التلقائية */
+        .input-dark:-webkit-autofill,
+        .input-dark:-webkit-autofill:hover,
+        .input-dark:-webkit-autofill:focus {
+            -webkit-text-fill-color: #e1fdff !important;
+            -webkit-box-shadow: 0 0 0px 1000px #192122 inset !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+    </style>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "primary": "#e1fdff",
+                "primary-container": "#00f2ff",
+                "on-primary": "#00363a",
+                "surface": "#0d1515",
+                "surface-container": "#192122",
+                "on-surface": "#dce4e4",
+                "on-surface-variant": "#b9cacb"
+            }
+          }
+        }
+      }
+    </script>
+</head>
+<body class="flex flex-col min-h-screen">
+    <!-- TopAppBar -->
+    <header class="bg-surface/60 backdrop-blur-xl border-b border-white/10 docked full-width top-0 z-50 flex justify-between items-center px-6 h-16 w-full fixed">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary text-2xl">settings_input_antenna</span>
+            <h1 class="text-xl font-black text-primary drop-shadow-[0_0_10px_rgba(0,242,255,0.4)] tracking-tighter">RADAR</h1>
+        </div>
+        <div class="w-10 h-10 rounded-full border-2 border-primary/30 p-0.5 overflow-hidden animate-heartbeat">
+            <img class="w-full h-full object-cover rounded-full" src="{{ profile.avatar_url|default:'https://ui-avatars.com/api/?name='|add:profile.display_name }}" alt="Profile">
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow pt-24 pb-32 px-6 space-y-6 overflow-y-auto max-w-2xl mx-auto w-full">
+
+        <!-- الرسائل -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="glass-card border-emerald-500/30 bg-emerald-500/10 p-4 rounded-xl text-emerald-400 text-sm font-bold flex items-center gap-2">
+                    <span class="material-symbols-outlined">check_circle</span>
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Profile Section -->
+        <section class="glass-card rounded-2xl p-6">
+            <h2 class="text-2xl font-bold text-primary mb-6">الملف الشخصي</h2>
+
+            <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                {% csrf_token %}
+                
+                <div class="flex flex-col md:flex-row items-center gap-6 mb-8 bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <div class="relative group">
+                        <div class="w-24 h-24 rounded-full border-4 border-primary-container/30 overflow-hidden relative">
+                            <img id="avatar-preview" class="w-full h-full object-cover"
+                                 src="{% if profile.avatar %}{{ profile.avatar.url }}{% else %}{{ profile.avatar_url|default:'https://ui-avatars.com/api/?name='|add:profile.display_name }}{% endif %}" alt="Profile">
+                            <label class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                <span class="material-symbols-outlined text-white">photo_camera</span>
+                                <input type="file" name="avatar" class="hidden" onchange="previewImage(this)">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="text-center md:text-right flex-1">
+                        <h3 class="text-xl font-black text-white">{{ profile.display_name }}</h3>
+                        <p class="text-primary-container font-mono text-sm">LEVEL: اكتشاف ذكي</p>
+                        <div class="flex items-center justify-center md:justify-start gap-2 mt-2">
+                            <span class="bg-primary-container text-on-primary text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter">{{ profile.discovery_points }} POINT</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1">إعدادات الرؤية</label>
+                        <select name="visibility_level" class="input-dark w-full rounded-xl px-4 py-3 text-base appearance-none">
+                            <option value="ALL" {% if profile.visibility_level == 'ALL' %}selected{% endif %}>إظهار للجميع</option>
+                            <option value="GENDER" {% if profile.visibility_level == 'GENDER' %}selected{% endif %}>إظهار لنفس جنسي فقط</option>
+                            <option value="GHOST" {% if profile.visibility_level == 'GHOST' %}selected{% endif %}>وضع التخفي (Ghost)</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1">حالتك الحالية</label>
+                        <select name="current_intent" class="input-dark w-full rounded-xl px-4 py-3 text-base appearance-none">
+                            {% for code, label in profile.INTENT_CHOICES %}
+                            <option value="{{ code }}" {% if profile.current_intent == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1">الاسم المعروض</label>
+                    <input type="text" name="display_name" value="{{ profile.display_name }}"
+                           class="input-dark w-full rounded-xl px-4 py-3 text-base">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1">رقم الهاتف</label>
+                    <input type="tel" name="phone_number" value="{{ profile.phone_number|default:'' }}" dir="ltr"
+                           class="input-dark w-full rounded-xl px-4 py-3 text-left text-base">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1">حساب انستجرام</label>
+                    <input type="text" name="instagram_handle" value="{{ profile.instagram_handle }}" dir="ltr"
+                           class="input-dark w-full rounded-xl px-4 py-3 text-left text-base" placeholder="@username">
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1">الاهتمامات</label>
+                    <div class="flex flex-wrap gap-2 p-1">
+                        {% for interest in interests_all %}
+                        <label class="relative cursor-pointer">
+                            <input type="checkbox" name="interests" value="{{ interest.id }}" class="peer hidden"
+                                   {% if interest.id in my_interests_ids %}checked{% endif %}>
+                            <div class="px-4 py-2 rounded-xl bg-surface-container border border-white/10 text-xs font-bold text-on-surface-variant
+                                        peer-checked:bg-primary-container/20 peer-checked:border-primary-container peer-checked:text-primary transition-all">
+                                {{ interest.name }}
+                            </div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1">نبذة عنك</label>
+                    <textarea name="bio" rows="3"
+                              class="input-dark w-full rounded-xl px-4 py-3 text-base resize-none"
+                              placeholder="اكتب شيئاً عن نفسك...">{{ profile.bio }}</textarea>
+                </div>
+
+                <button type="submit" class="w-full py-4 bg-primary-container text-on-primary font-bold rounded-xl neon-glow hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 mt-4">
+                    <span class="material-symbols-outlined">save</span>
+                    حفظ التغييرات
+                </button>
+            </form>
+        </section>
+
+        <!-- Danger Zone -->
+        <section class="glass-card rounded-2xl p-6 border-red-500/20">
+            <h3 class="text-lg font-bold text-red-400 mb-4">منطقة الخطر</h3>
+            <a href="{% url 'logout' %}" class="w-full py-3 border border-red-500/30 text-red-400 font-bold rounded-xl hover:bg-red-500/10 transition-all flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">logout</span>
+                تسجيل الخروج
+            </a>
+
+            <form method="POST" action="{% url 'delete-account' %}" class="mt-4" onsubmit="return confirm('هل أنت متأكد من حذف حسابك نهائياً؟ لا يمكن التراجع عن هذا الإجراء.')">
+                {% csrf_token %}
+                <button type="submit" class="w-full py-3 text-red-600/50 text-xs font-bold hover:text-red-500 transition-colors flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-sm">delete_forever</span>
+                    حذف الحساب نهائياً
+                </button>
+            </form>
+
+            {% if request.user.is_superuser %}
+            <a href="{% url 'admin-dashboard' %}" class="w-full mt-6 py-3 bg-white/5 border border-white/10 text-white font-bold rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">admin_panel_settings</span>
+                لوحة تحكم الإدارة
+            </a>
+            {% endif %}
+        </section>
+    </main>
+
+    <!-- BottomNavBar -->
+    <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 px-4 pb-4 bg-surface-container/60 backdrop-blur-xl border-t border-white/10 rounded-t-xl shadow-[0_-4px_20px_rgba(0,242,255,0.15)]">
+        <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary-container transition-all" href="{% url 'radar-dashboard' %}">
+            <span class="material-symbols-outlined">radar</span>
+            <span class="text-[10px] font-bold mt-1">الرادار</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary-container transition-all" href="{% url 'discovery-page' %}">
+            <span class="material-symbols-outlined">group</span>
+            <span class="text-[10px] font-bold mt-1">المكتشفون</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-primary-container drop-shadow-[0_0_8px_rgba(0,242,255,0.6)]" href="{% url 'profile-page' %}">
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+            <span class="text-[10px] font-bold mt-1">الإعدادات</span>
+        </a>
+    </nav>
+    <script>
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('avatar-preview').src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+</body>
+</html>

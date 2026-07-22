@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html class="dark" lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Radar - لوحة التحكم</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Geist:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <style>
+        * { font-family: 'Tajawal', 'Geist', sans-serif; }
+        body { background-color: #0b0b0f; color: #dce4e4; }
+        .glass-card {
+            background: rgba(26, 26, 36, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .stat-card {
+            background: linear-gradient(135deg, rgba(0, 242, 255, 0.1) 0%, transparent 100%);
+            border: 1px solid rgba(0, 242, 255, 0.2);
+        }
+    </style>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#e1fdff",
+                        "primary-container": "#00f2ff",
+                        "surface": "#0d1515",
+                        "on-surface": "#dce4e4",
+                        "on-surface-variant": "#b9cacb"
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen p-6 pb-32">
+    <div class="max-w-6xl mx-auto">
+        <header class="flex justify-between items-center mb-10">
+            <div>
+                <h1 class="text-3xl font-black text-primary tracking-tight">لوحة تحكم الإدارة</h1>
+                <p class="text-on-surface-variant text-sm mt-1">نظام رادار المركزي - الإحصائيات والأعضاء</p>
+            </div>
+            <a href="{% url 'radar-dashboard' %}" class="material-symbols-outlined text-primary hover:scale-110 transition-transform">close</a>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+            <div class="glass-card stat-card p-4 rounded-2xl">
+                <p class="text-[10px] font-bold text-primary-container uppercase tracking-widest mb-1">إجمالي المستخدمين</p>
+                <h3 class="text-2xl font-black text-white">{{ stats.total_users }}</h3>
+            </div>
+            <div class="glass-card stat-card p-4 rounded-2xl">
+                <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">متصل الآن</p>
+                <h3 class="text-2xl font-black text-white">{{ stats.online_users }}</h3>
+            </div>
+            <div class="glass-card stat-card p-4 rounded-2xl">
+                <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">لقاءات الرادار</p>
+                <h3 class="text-2xl font-black text-white">{{ stats.total_contacts }}</h3>
+            </div>
+            <div class="glass-card stat-card p-4 rounded-2xl">
+                <p class="text-[10px] font-bold text-primary-container uppercase tracking-widest mb-1">مواقع مفعلة</p>
+                <h3 class="text-2xl font-black text-white">{{ stats.locations_set }}</h3>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- User List -->
+            <div class="lg:col-span-2 space-y-4">
+                <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined">group</span>
+                    قائمة الأعضاء
+                </h2>
+                <div class="space-y-3">
+                    {% for p in users %}
+                    <div class="glass-card p-4 rounded-2xl flex items-center justify-between group hover:border-primary/30 transition-all">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full border border-white/10 overflow-hidden bg-white/5">
+                                <img class="w-full h-full object-cover" src="{% if p.avatar %}{{ p.avatar.url }}{% else %}{{ p.avatar_url|default:'https://ui-avatars.com/api/?name='|add:p.display_name }}{% endif %}" alt="Avatar">
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white group-hover:text-primary transition-colors">{{ p.display_name }}</h4>
+                                <p class="text-[10px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+                                    <span class="material-symbols-outlined text-[12px]">{% if p.gender == 'M' %}male{% else %}female{% endif %}</span>
+                                    @{{ p.user.username }} • {{ p.phone_number|default:"لا يوجد رقم" }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="text-left">
+                            {% if p.is_online %}
+                            <span class="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full font-bold uppercase tracking-widest">Online</span>
+                            {% else %}
+                            <span class="text-[8px] bg-white/5 text-on-surface-variant px-2 py-1 rounded-full font-bold uppercase tracking-widest">Offline</span>
+                            {% endif %}
+                            <p class="text-[9px] text-on-surface-variant mt-1">{{ p.last_seen|date:"Y-m-d" }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Insights -->
+            <div class="space-y-6">
+                <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined">insights</span>
+                    تحليلات سريعة
+                </h2>
+
+                <!-- Gender Distribution -->
+                <div class="glass-card p-6 rounded-2xl">
+                    <p class="text-xs font-bold text-primary-container mb-4 uppercase tracking-widest">توزيع الجنس</p>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm">ذكور</span>
+                            <span class="text-sm font-bold">{{ stats.male_count }}</span>
+                        </div>
+                        <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-primary-container h-full" style="width: {% widthratio stats.male_count stats.total_users 100 %}%"></div>
+                        </div>
+                        <div class="flex items-center justify-between mt-2">
+                            <span class="text-sm">إناث</span>
+                            <span class="text-sm font-bold">{{ stats.female_count }}</span>
+                        </div>
+                        <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-pink-500 h-full" style="width: {% widthratio stats.female_count stats.total_users 100 %}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Interests -->
+                <div class="glass-card p-6 rounded-2xl">
+                    <p class="text-xs font-bold text-primary-container mb-4 uppercase tracking-widest">الاهتمامات الأكثر شيوعاً</p>
+                    <div class="space-y-3">
+                        {% for int in top_interests %}
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs">{{ int.name }}</span>
+                            <span class="text-[10px] bg-white/5 px-2 py-1 rounded-lg">{{ int.user_count }} مستخدم</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Nav (Admin can still navigate) -->
+    <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 px-4 pb-4 bg-surface-container/60 backdrop-blur-xl border-t border-white/10 rounded-t-xl shadow-[0_-4px_20px_rgba(0,242,255,0.15)]">
+        <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary-container transition-all" href="{% url 'radar-dashboard' %}">
+            <span class="material-symbols-outlined">radar</span>
+            <span class="text-[10px] font-bold mt-1">الرادار</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary-container transition-all" href="{% url 'discovery-page' %}">
+            <span class="material-symbols-outlined">group</span>
+            <span class="text-[10px] font-bold mt-1">المكتشفون</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-primary-container drop-shadow-[0_0_8px_rgba(0,242,255,0.6)]" href="{% url 'profile-page' %}">
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+            <span class="text-[10px] font-bold mt-1">الإعدادات</span>
+        </a>
+    </nav>
+</body>
+</html>

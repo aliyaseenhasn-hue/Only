@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html class="dark" dir="rtl" lang="ar">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Radar - الاكتشاف</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Geist:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <style>
+        * { font-family: 'Tajawal', 'Geist', sans-serif; }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .animate-heartbeat {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .glass-card {
+            background: rgba(26, 26, 36, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            border-color: rgba(0, 242, 255, 0.5);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
+        }
+        body {
+            background-color: #0d1515;
+            color: #dce4e4;
+            overflow-x: hidden;
+        }
+    </style>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#e1fdff",
+                        "on-primary": "#00363a",
+                        "primary-container": "#00f2ff",
+                        "on-primary-container": "#006a71",
+                        "surface": "#0d1515",
+                        "surface-container": "#192122",
+                        "on-surface": "#dce4e4",
+                        "on-surface-variant": "#b9cacb"
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-body-md text-on-surface">
+    <!-- TopAppBar -->
+    <header class="bg-surface/60 backdrop-blur-xl border-b border-white/10 docked full-width top-0 z-50 flex justify-between items-center px-6 h-16 w-full fixed">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary scale-110">settings_input_antenna</span>
+            <h1 class="text-xl font-black text-primary drop-shadow-[0_0_10px_rgba(0,242,255,0.4)] tracking-tighter">RADAR</h1>
+        </div>
+        <div class="w-10 h-10 rounded-full border border-primary/30 overflow-hidden hover:opacity-80 transition-opacity cursor-pointer">
+            <img class="w-full h-full object-cover" src="https://ui-avatars.com/api/?name=User" alt="Profile">
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pt-24 pb-28 px-6 min-h-screen relative overflow-hidden">
+        <!-- Atmospheric Background Effect -->
+        <div class="fixed inset-0 pointer-events-none opacity-20 overflow-hidden">
+            <div class="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-primary-container blur-[120px]"></div>
+            <div class="absolute bottom-[-5%] left-[-10%] w-[300px] h-[300px] rounded-full bg-cyan-600 blur-[100px]"></div>
+        </div>
+
+        <div class="relative z-10 max-w-2xl mx-auto">
+            <!-- Header Section -->
+            <div class="mb-8">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="flex h-2 w-2 rounded-full bg-primary-container animate-pulse"></span>
+                    <span class="text-xs font-bold text-primary/70 uppercase tracking-widest">LIVE SCANNING</span>
+                </div>
+                <h2 class="text-2xl font-bold text-on-surface">تم العثور على {{ total_found }} شخصاً بالقرب منك</h2>
+                <p class="text-on-surface-variant text-sm mt-1 opacity-80">نطاق المسح الحالي: ٢.٥ كم</p>
+            </div>
+
+            <!-- Discovery List -->
+            <div class="space-y-4">
+                {% if nearby_people %}
+                    {% for person in nearby_people %}
+                        <a href="{% url 'user-detail' person.id %}" class="glass-card p-4 rounded-xl flex items-center justify-between group active:scale-95 duration-200 block">
+                            <div class="flex items-center gap-4">
+                                <div class="relative">
+                                    <div class="w-14 h-14 rounded-full overflow-hidden border-2 border-primary-container/20 group-hover:border-primary-container transition-colors bg-surface-container flex items-center justify-center text-primary-container text-xl font-bold">
+                                        <img class="w-full h-full object-cover" src="{{ person.avatar_url }}" alt="{{ person.display_name }}">
+                                    </div>
+                                    {% if person.is_online %}
+                                        <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-primary-container rounded-full border-2 border-surface animate-heartbeat"></div>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-primary group-hover:text-white transition-colors">{{ person.display_name }}</h3>
+                                    <div class="flex flex-col gap-0.5 mt-1">
+                                        <p class="text-[10px] text-primary-container/80 font-bold">{{ person.area_name|default:"منطقة غير معروفة" }}</p>
+                                        <p class="text-xs text-on-surface-variant flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-[14px]">share_location</span>
+                                            {% if person.is_online %}نشط الآن{% else %}نشط مؤخراً{% endif %}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-left flex flex-col items-end gap-1">
+                                <span class="text-primary font-mono text-sm bg-primary-container/10 px-3 py-1 rounded-full border border-primary-container/20">{{ person.distance }}km</span>
+                                <span class="text-[10px] text-on-surface-variant">{{ person.direction }}</span>
+                            </div>
+                        </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="glass-card p-12 text-center rounded-2xl">
+                        <span class="material-symbols-outlined text-6xl text-primary/20 mb-4">radar</span>
+                        <p class="text-on-surface-variant font-bold">لا يوجد أشخاص بالقرب منك حالياً</p>
+                        <p class="text-xs text-on-surface-variant/60 mt-2">تأكد من تفعيل الموقع الجغرافي</p>
+                    </div>
+                {% endif %}
+
+                <!-- History Link -->
+                <div class="mt-8 pt-6 border-t border-white/5">
+                    <a href="{% url 'contact-history' %}" class="flex items-center justify-center gap-2 text-primary-container hover:underline font-bold text-sm">
+                        <span class="material-symbols-outlined">history</span>
+                        عرض سجل الاكتشافات السابقة
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- BottomNavBar -->
+    <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 px-4 pb-4 bg-surface-container/60 backdrop-blur-xl border-t border-white/10 rounded-t-xl shadow-[0_-4px_20px_rgba(0,242,255,0.15)]">
+        <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary-container transition-all active:scale-90 duration-150" href="{% url 'radar-dashboard' %}">
+            <span class="material-symbols-outlined">radar</span>
+            <span class="text-[10px] font-bold mt-1">الرادار</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-primary-container drop-shadow-[0_0_8px_rgba(0,242,255,0.6)] active:scale-90 duration-150" href="{% url 'discovery-page' %}">
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span>
+            <span class="text-[10px] font-bold mt-1">المكتشفون</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary-container transition-all active:scale-90 duration-150" href="{% url 'profile-page' %}">
+            <span class="material-symbols-outlined">settings</span>
+            <span class="text-[10px] font-bold mt-1">الإعدادات</span>
+        </a>
+    </nav>
+</body>
+</html>
