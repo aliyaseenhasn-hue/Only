@@ -75,6 +75,22 @@ class UserProfile(models.Model):
         }
 
 
+class PasswordResetOTP(models.Model):
+    """رمز تحقق مؤقت لإعادة تعيين كلمة المرور عبر رقم الهاتف."""
+    phone_number = models.CharField(max_length=20, db_index=True)
+    code = models.CharField(max_length=10)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'رمز إعادة تعيين'
+        verbose_name_plural = 'رموز إعادة التعيين'
+
+    def __str__(self):
+        return f'OTP for {self.phone_number} @ {self.created_at:%Y-%m-%d %H:%M}'
+
+
 class ContactHistory(models.Model):
     """سجل اللقاءات مع الأشخاص القريبين"""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contacts_found')

@@ -1,15 +1,20 @@
 import json
+import logging
+
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
-from geopy.geocoders import Nominatim
 
-from .models import UserProfile, ContactHistory, Interest, ConnectionRequest
+from . import services
+from .models import ConnectionRequest, ContactHistory, Interest, UserProfile
+
+logger = logging.getLogger('api')
 
 
 def authenticate_by_phone_or_username(request, identifier, password):
@@ -87,21 +92,21 @@ def profile_screen(request):
         profile.phone_number = request.POST.get('phone_number', profile.phone_number)
         profile.instagram_handle = request.POST.get('instagram_handle', profile.instagram_handle)
         profile.bio = request.POST.get('bio', profile.bio)
-        
+
         selected_interests = request.POST.getlist('interests')
         profile.interests_list.set(selected_interests)
 
         # ميزات جديدة في البروفايل
         profile.visibility_level = request.POST.get('visibility_level', profile.visibility_level)
         profile.current_intent = request.POST.get('current_intent', profile.current_intent)
-        
+
         if 'avatar' in request.FILES:
             profile.avatar = request.FILES['avatar']
 
         profile.save()
         messages.success(request, 'تم حفظ التغييرات ✅')
         return redirect('profile-page')
-        
+
     my_interests_ids = profile.interests_list.values_list('id', flat=True)
     return render(request, 'profile.html', {
         'profile': profile,
@@ -123,28 +128,19 @@ def update_location(request):
     try:
         profile.latitude = float(latitude) if latitude else None
         profile.longitude = float(longitude) if longitude else None
-        
-        # جلب اسم المنطقة
-        if profile.latitude and profile.longitude:
-            try:
-                geolocator = Nominatim(user_agent="radar_app")
-                location = geolocator.reverse(f"{profile.latitude}, {profile.longitude}", language='ar')
-                if location:
-                    # محاولة استخراج اسم المنطقة أو المدينة
-                    address = location.raw.get('address', {})
-                    profile.area_name = address.get('suburb') or address.get('neighbourhood') or address.get('city') or address.get('town') or "منطقة غير معروفة"
-            except Exception:
-                profile.area_name = "تعذر جلب المنطقة"
 
-        profile.save()
+        # جلب اسم المنطقة (مع تخزين مؤقت لتقليل استدعاءات Nominatim)
+        if profile.latitude and profile.longitude:
+            profile.area_name = services.reverse_geocode(profile.latitude, profile.longitude)
+
         profile.is_online = True
-        profile.save(update_fields=['is_online', 'area_name'])
+        profile.save()
+        # لا نُرجع إحداثياتنا الدقيقة ضرورةً، لكنها ملك المستخدم نفسه فلا بأس
         return JsonResponse({
             'success': True,
             'message': 'تم حفظ الموقع بنجاح',
-            'latitude': profile.latitude,
-            'longitude': profile.longitude,
             'area_name': profile.area_name,
+            'is_online': services.is_profile_online(profile),
         })
     except (ValueError, TypeError):
         return JsonResponse({'error': 'يرجى إدخال إحداثيات صحيحة.'}, status=400)
@@ -165,115 +161,13 @@ def delete_account(request):
     return redirect('profile-page')
 
 
-def haversine_distance(lat1, lon1, lat2, lon2):
-    import math
-    r = 6371.0
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
-    a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return round(r * c, 2)
-
-
-def direction_name(lat1, lon1, lat2, lon2):
-    import math
-    y = math.sin(math.radians(lon2 - lon1)) * math.cos(math.radians(lat2))
-    x = math.cos(math.radians(lat1)) * math.sin(math.radians(lat2)) - math.sin(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.cos(math.radians(lon2 - lon1))
-    bearing = (math.degrees(math.atan2(y, x)) + 360) % 360
-    if bearing < 22.5 or bearing >= 337.5: return 'شمال'
-    if 22.5 <= bearing < 67.5: return 'شمال شرق'
-    if 67.5 <= bearing < 112.5: return 'شرق'
-    if 112.5 <= bearing < 157.5: return 'جنوب شرق'
-    if 157.5 <= bearing < 202.5: return 'جنوب'
-    if 202.5 <= bearing < 247.5: return 'جنوب غرب'
-    if 247.5 <= bearing < 292.5: return 'غرب'
-    return 'شمال غرب'
-
-
 @login_required(login_url='login-page')
 def radar_dashboard(request):
     profile, created = UserProfile.objects.get_or_create(
         user=request.user,
         defaults={'display_name': request.user.username}
     )
-    all_profiles = UserProfile.objects.exclude(user=request.user).filter(
-        latitude__isnull=False, longitude__isnull=False
-    ).exclude(visibility_level='GHOST')
-    
-    # فلترة حسب الجنس إذا اختار المستخدم
-    if profile.visibility_level == 'GENDER':
-        all_profiles = all_profiles.filter(gender=profile.gender)
-    nearby_people = []
-    current_location_available = profile.latitude is not None and profile.longitude is not None
-    new_found_contacts = []
-
-    if current_location_available:
-        for item in all_profiles:
-            distance = haversine_distance(profile.latitude, profile.longitude, item.latitude, item.longitude)
-            # إذا كان الشخص ضمن 2.5 كم
-            if distance <= 2.5:
-                person_data = {
-                    'id': item.user.id,
-                    'display_name': item.display_name,
-                    'email': item.user.email,
-                    'instagram_handle': item.instagram_handle,
-                    'avatar_url': item.avatar.url if item.avatar else (item.avatar_url or 'https://ui-avatars.com/api/?name=' + item.display_name.replace(' ', '+')),
-                    'distance': distance,
-                    'direction': direction_name(profile.latitude, profile.longitude, item.latitude, item.longitude),
-                    'area_name': item.area_name,
-                    'is_online': item.is_online,
-                    'intent_display': item.get_current_intent_display(),
-                    'latitude': item.latitude,
-                    'longitude': item.longitude,
-                }
-                nearby_people.append(person_data)
-
-                # سجل في ContactHistory إذا أول مرة نلقاه اليوم
-                today = timezone.now().date()
-                already_logged = ContactHistory.objects.filter(
-                    user=request.user,
-                    found_user=item.user,
-                    found_at__date=today,
-                ).exists()
-                if not already_logged:
-                    ContactHistory.objects.create(
-                        user=request.user,
-                        found_user=item.user,
-                        found_user_display=item.display_name,
-                        found_user_instagram=item.instagram_handle,
-                        latitude=profile.latitude,
-                        longitude=profile.longitude,
-                        distance=distance,
-                        direction=direction_name(profile.latitude, profile.longitude, item.latitude, item.longitude),
-                    )
-                    # إضافة نقاط اكتشاف
-                    profile.discovery_points += 10
-                    profile.save(update_fields=['discovery_points'])
-                    new_found_contacts.append(person_data)
-
-        nearby_people.sort(key=lambda item: item['distance'])
-
-    if not current_location_available and all_profiles.exists():
-        for item in all_profiles[:5]:
-            nearby_people.append({
-                'id': item.user.id,
-                'display_name': item.display_name,
-                'email': item.user.email,
-                'instagram_handle': item.instagram_handle,
-                'avatar_url': item.avatar.url if item.avatar else (item.avatar_url or 'https://ui-avatars.com/api/?name=' + item.display_name.replace(' ', '+')),
-                'distance': None,
-                'direction': 'غير متوفر',
-                'is_online': item.is_online,
-                'intent_display': item.get_current_intent_display(),
-            })
-
-    events = [
-        {'place': 'مقهى المدينة', 'title': 'لقاء محبي التقنية', 'time': 'اليوم ٧:٠٠ م'},
-        {'place': 'المنتزه المركزي', 'title': 'جولة رياضية مفتوحة', 'time': 'غدًا ١٠:٠٠ ص'},
-        {'place': 'مكتبة الأصدقاء', 'title': 'ورش عمل ثقافية', 'time': 'بعد ساعتين'},
-    ]
+    nearby_people, new_found_contacts = services.get_nearby_people(profile)
 
     online_count = sum(1 for person in nearby_people if person['is_online'])
     stats = {
@@ -287,20 +181,19 @@ def radar_dashboard(request):
     # طلبات الاتصال الواردة
     pending_requests = ConnectionRequest.objects.filter(receiver=request.user, status='PENDING')
 
-    # تحضير بيانات JSON للرادار التفاعلي
+    # بيانات JSON للرادار التفاعلي — بدون إحداثيات دقيقة للعملاء
     nearby_people_json = json.dumps({
         'people': [
             {
-                'id': p.get('id'),
+                'id': p['id'],
                 'display_name': p['display_name'],
-                'latitude': p.get('latitude'),
-                'longitude': p.get('longitude'),
                 'avatar_url': p.get('avatar_url'),
                 'intent': p.get('intent_display'),
                 'is_online': p['is_online'],
                 'distance': p['distance'],
+                'direction': p['direction'],
             }
-            for p in nearby_people if p.get('latitude')
+            for p in nearby_people
         ],
         'myLat': profile.latitude,
         'myLng': profile.longitude,
@@ -309,9 +202,9 @@ def radar_dashboard(request):
     return render(request, 'radar_dashboard.html', {
         'user_profile': profile,
         'nearby_people': nearby_people,
-        'events': events,
+        'events': [],  # مصدر بيانات فعلي لاحقاً بدل البيانات الوهمية
         'stats': stats,
-        'current_location_available': current_location_available,
+        'current_location_available': profile.location_available(),
         'new_found_contacts': new_found_contacts,
         'total_contacts': total_contacts,
         'pending_requests': pending_requests,
@@ -346,33 +239,68 @@ def contact_history_view(request):
     })
 
 
+# ---------------- إعادة تعيين كلمة المرور عبر OTP ----------------
+
 def reset_password_screen(request):
-    """إعادة تعيين كلمة السر باستخدام رقم الهاتف"""
+    """الخطوة 1: طلب رمز OTP بناءً على رقم الهاتف."""
     if request.method == 'POST':
         phone = request.POST.get('phone')
-        new_password = request.POST.get('new_password')
-        new_password_confirm = request.POST.get('new_password_confirm')
-
         try:
-            profile = UserProfile.objects.get(phone_number=phone)
+            UserProfile.objects.get(phone_number=phone)
         except UserProfile.DoesNotExist:
             messages.error(request, 'رقم الهاتف غير مسجل.')
-            return render(request, 'reset_password.html')
+            return render(request, 'reset_password.html', {'step': 'request'})
 
-        if new_password != new_password_confirm:
-            messages.error(request, 'كلمتا المرور غير متطابقتين.')
-            return render(request, 'reset_password.html')
+        otp = services.generate_otp(phone)
+        if otp is None:
+            messages.error(request, 'يرجى الانتظار قبل طلب رمز جديد.')
+            return render(request, 'reset_password.html', {'step': 'request', 'phone': phone})
 
-        if len(new_password) < 6:
-            messages.error(request, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.')
-            return render(request, 'reset_password.html')
+        # ملاحظة: في الإنتاج يُرسل الرمز عبر بوابة SMS. للتطوير نُظهره في الرسائل.
+        if settings.DEBUG:
+            messages.info(request, f'رمز التحقق (للتطوير): {otp.code}')
+        else:
+            messages.success(request, 'تم إرسال رمز التحقق إلى رقم هاتفك.')
+        return render(request, 'reset_password.html', {'step': 'confirm', 'phone': phone})
 
-        profile.user.set_password(new_password)
-        profile.user.save()
-        messages.success(request, 'تم إعادة تعيين كلمة السر بنجاح ✅')
-        return redirect('login-page')
+    return render(request, 'reset_password.html', {'step': 'request'})
 
-    return render(request, 'reset_password.html')
+
+def reset_password_confirm(request):
+    """الخطوة 2: التحقق من الرمز وتعيين كلمة المرور الجديدة."""
+    if request.method != 'POST':
+        return redirect('reset-password-page')
+
+    phone = request.POST.get('phone', '')
+    code = request.POST.get('code', '')
+    new_password = request.POST.get('new_password', '')
+    new_password_confirm = request.POST.get('new_password_confirm', '')
+
+    otp = services.verify_otp(phone, code)
+    if not otp:
+        messages.error(request, 'رمز التحقق غير صحيح أو منتهي الصلاحية.')
+        return render(request, 'reset_password.html', {'step': 'confirm', 'phone': phone})
+
+    if new_password != new_password_confirm:
+        messages.error(request, 'كلمتا المرور غير متطابقتين.')
+        return render(request, 'reset_password.html', {'step': 'confirm', 'phone': phone})
+
+    if len(new_password) < 6:
+        messages.error(request, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.')
+        return render(request, 'reset_password.html', {'step': 'confirm', 'phone': phone})
+
+    try:
+        profile = UserProfile.objects.get(phone_number=phone)
+    except UserProfile.DoesNotExist:
+        messages.error(request, 'رقم الهاتف غير مسجل.')
+        return redirect('reset-password-page')
+
+    profile.user.set_password(new_password)
+    profile.user.save()
+    otp.used = True
+    otp.save()
+    messages.success(request, 'تم إعادة تعيين كلمة السر بنجاح ✅')
+    return redirect('login-page')
 
 
 @login_required(login_url='login-page')
@@ -381,34 +309,7 @@ def discovery_screen(request):
         user=request.user,
         defaults={'display_name': request.user.username}
     )
-    all_profiles = UserProfile.objects.exclude(user=request.user).filter(
-        latitude__isnull=False, longitude__isnull=False
-    ).exclude(visibility_level='GHOST')
-    
-    # فلترة حسب الجنس إذا اختار المستخدم
-    if profile.visibility_level == 'GENDER':
-        all_profiles = all_profiles.filter(gender=profile.gender)
-    nearby_people = []
-    current_location_available = profile.latitude is not None and profile.longitude is not None
-
-    if current_location_available:
-        for item in all_profiles:
-            distance = haversine_distance(profile.latitude, profile.longitude, item.latitude, item.longitude)
-            if distance <= 2.5:
-                nearby_people.append({
-                    'id': item.user.id,
-                    'display_name': item.display_name,
-                    'instagram_handle': item.instagram_handle,
-                    'avatar_url': item.avatar.url if item.avatar else (item.avatar_url or 'https://ui-avatars.com/api/?name=' + item.display_name.replace(' ', '+')),
-                    'distance': distance,
-                    'direction': direction_name(profile.latitude, profile.longitude, item.latitude, item.longitude),
-                    'area_name': item.area_name,
-                    'is_online': item.is_online,
-                    'intent_display': item.get_current_intent_display(),
-                    'last_seen': item.last_seen,
-                })
-        nearby_people.sort(key=lambda x: x['distance'])
-
+    nearby_people, _ = services.get_nearby_people(profile)
     return render(request, 'discovery.html', {
         'nearby_people': nearby_people,
         'total_found': len(nearby_people),
@@ -427,29 +328,43 @@ def user_detail_view(request, user_id):
     distance = None
     direction = "غير متوفر"
     if my_profile.location_available() and target_profile.location_available():
-        distance = haversine_distance(my_profile.latitude, my_profile.longitude, target_profile.latitude, target_profile.longitude)
-        direction = direction_name(my_profile.latitude, my_profile.longitude, target_profile.latitude, target_profile.longitude)
+        distance = services.haversine_distance(
+            my_profile.latitude, my_profile.longitude,
+            target_profile.latitude, target_profile.longitude)
+        direction = services.direction_name(
+            my_profile.latitude, my_profile.longitude,
+            target_profile.latitude, target_profile.longitude)
 
     # التحقق من حالة الاتصال
     connection = ConnectionRequest.objects.filter(sender=request.user, receiver=target_user).first()
     if not connection:
-        # التحقق إذا كان الطرف الآخر قد أرسل طلباً بالفعل
         received_connection = ConnectionRequest.objects.filter(sender=target_user, receiver=request.user).first()
         if received_connection and received_connection.status == 'ACCEPTED':
             connection = received_connection
+
+    # إظهار بيانات التواصل فقط بعد قبول اتصال
+    connected = bool(connection and connection.status == 'ACCEPTED')
 
     return render(request, 'user_profile.html', {
         'target_profile': target_profile,
         'distance': distance,
         'direction': direction,
         'connection': connection,
+        'show_contact_info': connected,
     })
 
 
 @login_required(login_url='login-page')
 def send_connection_request(request, user_id):
     if request.method == 'POST':
-        receiver = User.objects.get(id=user_id)
+        try:
+            receiver = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            messages.error(request, 'المستخدم غير موجود.')
+            return redirect('radar-dashboard')
+        if receiver == request.user:
+            messages.error(request, 'لا يمكنك إرسال طلب لنفسك.')
+            return redirect('radar-dashboard')
         ConnectionRequest.objects.get_or_create(sender=request.user, receiver=receiver)
         messages.success(request, 'تم إرسال طلب الاتصال بنجاح.')
     return redirect('user-detail', user_id=user_id)
@@ -457,7 +372,11 @@ def send_connection_request(request, user_id):
 
 @login_required(login_url='login-page')
 def respond_connection_request(request, request_id, action):
-    conn_request = ConnectionRequest.objects.get(id=request_id, receiver=request.user)
+    try:
+        conn_request = ConnectionRequest.objects.get(id=request_id, receiver=request.user)
+    except ConnectionRequest.DoesNotExist:
+        messages.error(request, 'طلب الاتصال غير موجود.')
+        return redirect('radar-dashboard')
     if action == 'accept':
         conn_request.status = 'ACCEPTED'
         conn_request.save()
@@ -473,22 +392,22 @@ def respond_connection_request(request, request_id, action):
 def admin_dashboard(request):
     if not request.user.is_superuser:
         return redirect('radar-dashboard')
-    
+
     users = UserProfile.objects.select_related('user').all().order_by('-last_seen')
-    
+
     # الإحصائيات
     stats = {
         'total_users': User.objects.count(),
-        'online_users': UserProfile.objects.filter(is_online=True).count(),
+        'online_users': sum(1 for p in users if services.is_profile_online(p)),
         'male_count': UserProfile.objects.filter(gender='M').count(),
         'female_count': UserProfile.objects.filter(gender='F').count(),
         'total_contacts': ContactHistory.objects.count(),
         'locations_set': UserProfile.objects.filter(latitude__isnull=False).count(),
     }
-    
+
     # توزيع الاهتمامات
     top_interests = Interest.objects.annotate(user_count=Count('profiles')).order_by('-user_count')[:5]
-    
+
     return render(request, 'admin_dashboard.html', {
         'users': users,
         'stats': stats,

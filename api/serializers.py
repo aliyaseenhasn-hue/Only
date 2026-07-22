@@ -70,7 +70,3 @@ class NearbyPersonSerializer(serializers.Serializer):
     distance = serializers.FloatField()
     direction = serializers.CharField()
     is_online = serializers.BooleanField()
-
-
-class GoogleAuthSerializer(serializers.Serializer):
-    token = serializers.CharField()
