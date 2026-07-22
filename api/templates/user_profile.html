@@ -70,7 +70,7 @@
         </div>
     </header>
 
-    <main class="flex-grow relative flex items-center justify-center overflow-hidden pt-16">
+    <main class="flex-grow relative flex justify-center overflow-y-auto pt-16" style="padding-bottom: calc(6rem + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch;">
         <!-- Background Radar Animation -->
         <div class="absolute inset-0 z-0 opacity-40">
             <div class="absolute inset-0 flex items-center justify-center">
@@ -85,7 +85,7 @@
         <div class="absolute inset-0 bg-black/60 z-10 backdrop-blur-[2px]"></div>
 
         <!-- Profile Card -->
-        <div class="relative z-20 w-full max-w-[340px] glass-card rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
+        <div class="relative z-20 w-full max-w-[340px] glass-card rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300 my-auto">
             <!-- Profile Photo Header -->
             <div class="relative h-64 overflow-hidden">
                 <img class="w-full h-full object-cover" src="{% if target_profile.avatar %}{{ target_profile.avatar.url }}{% else %}{{ target_profile.avatar_url|default:'https://ui-avatars.com/api/?name='|add:target_profile.display_name }}{% endif %}" alt="{{ target_profile.display_name }}">
@@ -189,7 +189,7 @@
     </main>
 
     <!-- BottomNavBar -->
-    <nav class="fixed bottom-0 left-0 w-full z-50 bg-surface-container/60 backdrop-blur-xl flex justify-around items-center h-20 px-4 pb-4 border-t border-white/10 rounded-t-xl shadow-[0_-4px_20px_rgba(0,242,255,0.15)]">
+    <nav class="fixed bottom-0 left-0 w-full z-50 bg-surface-container/60 backdrop-blur-xl flex justify-around items-center h-20 px-4 border-t border-white/10 rounded-t-xl shadow-[0_-4px_20px_rgba(0,242,255,0.15)]" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom));">
         <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary-container transition-all" href="{% url 'radar-dashboard' %}">
             <span class="material-symbols-outlined">radar</span>
             <span class="text-[10px] font-bold mt-1">الرادار</span>
