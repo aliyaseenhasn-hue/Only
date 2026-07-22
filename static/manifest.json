@@ -5,8 +5,8 @@
   "start_url": "/api/radar/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0ea5e9",
-  "theme_color": "#0ea5e9",
+  "background_color": "#0d1515",
+  "theme_color": "#00f2ff",
   "icons": [
     {
       "src": "/static/icons/icon-192.png",

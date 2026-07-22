@@ -256,13 +256,15 @@ def radar_dashboard(request):
     if not current_location_available and all_profiles.exists():
         for item in all_profiles[:5]:
             nearby_people.append({
+                'id': item.user.id,
                 'display_name': item.display_name,
                 'email': item.user.email,
                 'instagram_handle': item.instagram_handle,
-                'avatar_url': item.avatar_url or 'https://ui-avatars.com/api/?name=' + item.display_name.replace(' ', '+'),
+                'avatar_url': item.avatar.url if item.avatar else (item.avatar_url or 'https://ui-avatars.com/api/?name=' + item.display_name.replace(' ', '+')),
                 'distance': None,
                 'direction': 'غير متوفر',
                 'is_online': item.is_online,
+                'intent_display': item.get_current_intent_display(),
             })
 
     events = [

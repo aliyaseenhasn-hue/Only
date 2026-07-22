@@ -201,6 +201,7 @@
     </nav>
 
     <script id="radar-data" type="application/json">{{ nearby_people_json }}</script>
+    <audio id="radar-ping" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
     <script>
         function getCookie(n){let c=null;if(document.cookie&&document.cookie!==''){const a=document.cookie.split(';');for(let i=0;i<a.length;i++){const b=a[i].trim();if(b.substring(0,n.length+1)===(n+'=')){c=decodeURIComponent(b.substring(n.length+1));break}}}return c}
 
@@ -209,14 +210,40 @@
         let myLng = null;
         let activePoint = null;
 
+        function setupNotifications() {
+            if ("Notification" in window && Notification.permission !== "granted") {
+                Notification.requestPermission();
+            }
+        }
+
+        function triggerNotification(name, dist) {
+            const audio = document.getElementById('radar-ping');
+            if (audio) audio.play().catch(e => {});
+
+            if (Notification.permission === "granted") {
+                new Notification("رادار: شخص قريب!", {
+                    body: `تم اكتشاف ${name} على بعد ${dist} كم`,
+                    icon: "/static/icons/icon-192.png"
+                });
+            }
+        }
+
         function updateRadarData() {
             const radarDataEl = document.getElementById('radar-data');
             if (radarDataEl) {
                 try {
                     const data = JSON.parse(radarDataEl.textContent);
+                    const oldIds = nearbyPeople.map(p => p.id);
                     nearbyPeople = data.people || [];
                     myLat = data.myLat;
                     myLng = data.myLng;
+
+                    // البحث عن أشخاص جدد لم يكونوا موجودين في القائمة السابقة
+                    nearbyPeople.forEach(p => {
+                        if (!oldIds.includes(p.id) && oldIds.length > 0) {
+                            triggerNotification(p.display_name, p.distance);
+                        }
+                    });
                 } catch(e) { console.error("Error parsing radar data", e); }
             }
         }
@@ -299,6 +326,14 @@
         }
 
         document.addEventListener('DOMContentLoaded',function(){
+            // تسجيل Service Worker لـ PWA
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(reg => console.log('Service Worker Registered'))
+                    .catch(err => console.log('SW Registration Failed', err));
+            }
+
+            setupNotifications();
             updateRadarData();
             animateRadar();
 
