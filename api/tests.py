@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from api import services
-from api.models import PasswordResetOTP, UserProfile
+from api.models import ConnectionRequest, PasswordResetOTP, UserProfile
 
 
 class DistanceAndDirectionTests(TestCase):
@@ -52,20 +52,31 @@ class NearbyPrivacyTests(TestCase):
         self.pa.save()
         self.pb.latitude, self.pb.longitude = 33.3160, 44.3670
         self.pb.display_name = 'Person B'
+        self.pb.instagram_handle = 'personb'
         self.pb.save()
 
-    def test_email_and_instagram_hidden_without_connection(self):
+    def test_instagram_public_but_email_hidden_without_connection(self):
         nearby, _ = services.get_nearby_people(self.pa)
         self.assertTrue(nearby)
         person = nearby[0]
+        # الإنستغرام متاح للتواصل العام بدون طلب
+        self.assertIn('instagram_handle', person)
+        self.assertTrue(person['instagram_handle'])
+        # البريد يبقى مخفياً حتى قبول اتصال (الواتساب)
         self.assertNotIn('email', person)
-        self.assertNotIn('instagram_handle', person)
 
     def test_ghost_excluded(self):
         self.pb.visibility_level = 'GHOST'
         self.pb.save()
         nearby, _ = services.get_nearby_people(self.pa)
         self.assertEqual(len(nearby), 0)
+
+    def test_email_revealed_after_accepted_connection(self):
+        ConnectionRequest.objects.create(
+            sender=self.pa.user, receiver=self.pb.user, status='ACCEPTED')
+        nearby, _ = services.get_nearby_people(self.pa)
+        person = nearby[0]
+        self.assertIn('email', person)
 
 
 class OTPTests(TestCase):

@@ -105,16 +105,13 @@ def get_nearby_people(profile, include_sensitive=False):
             'area_name': item.area_name,
             'is_online': is_profile_online(item),
             'intent_display': item.get_current_intent_display(),
+            'avatar_url': _avatar_for(item),
+            # الإنستغرام للتواصل العام بدون طلب
+            'instagram_handle': item.instagram_handle,
         }
-        # بيانات حساسة تُكشف فقط بعد قبول اتصال
+        # بيانات حساسة (البريد) تُكشف فقط بعد قبول اتصال (الواتساب)
         if include_sensitive or connected:
-            person.update({
-                'email': item.user.email,
-                'instagram_handle': item.instagram_handle,
-                'avatar_url': _avatar_for(item),
-            })
-        else:
-            person['avatar_url'] = _avatar_for(item)
+            person['email'] = item.user.email
         nearby.append(person)
 
         # سجل في ContactHistory إذا أول مرة نلقاه اليوم
@@ -125,7 +122,7 @@ def get_nearby_people(profile, include_sensitive=False):
             ContactHistory.objects.create(
                 user=profile.user, found_user=item.user,
                 found_user_display=item.display_name,
-                found_user_instagram=item.instagram_handle if connected else '',
+                found_user_instagram=item.instagram_handle,
                 latitude=profile.latitude, longitude=profile.longitude,
                 distance=distance,
                 direction=person['direction'],
