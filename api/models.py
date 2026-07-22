@@ -44,7 +44,7 @@ class UserProfile(models.Model):
     current_intent = models.CharField(max_length=10, choices=INTENT_CHOICES, default='NONE')
     discovery_points = models.IntegerField(default=0)
 
-    instagram_handle = models.CharField(max_length=100, blank=True)
+    instagram_handle = models.CharField(max_length=100) # تم جعله إجبارياً
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     avatar_url = models.URLField(blank=True)
     bio = models.TextField(blank=True)
@@ -100,3 +100,22 @@ class ContactHistory(models.Model):
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.create(user=instance, display_name=instance.username)
+
+
+class ConnectionRequest(models.Model):
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_requests')
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_requests')
+    status = models.CharField(max_length=20, choices=(
+        ('PENDING', 'قيد الانتظار'),
+        ('ACCEPTED', 'تم القبول'),
+        ('REJECTED', 'تم الرفض')
+    ), default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('sender', 'receiver')
+        verbose_name = 'طلب اتصال'
+        verbose_name_plural = 'طلبات الاتصال'
+
+    def __str__(self):
+        return f'{self.sender.username} -> {self.receiver.username} ({self.status})'

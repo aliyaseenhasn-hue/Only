@@ -14,4 +14,6 @@ urlpatterns = [
     path('user/<int:user_id>/', views.user_detail_view, name='user-detail'),
     path('delete-account/', views.delete_account, name='delete-account'),
     path('control-panel/', views.admin_dashboard, name='admin-dashboard'),
+    path('connect/<int:user_id>/', views.send_connection_request, name='send-connection'),
+    path('respond-request/<int:request_id>/<str:action>/', views.respond_connection_request, name='respond-connection'),
 ]

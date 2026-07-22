@@ -182,6 +182,29 @@
         {% endif %}
 
         <div id="geo-status" class="fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl text-sm font-bold z-50 hidden"></div>
+
+        <!-- Connection Requests -->
+        {% if pending_requests %}
+        <div class="fixed top-20 right-6 z-[60] w-72 space-y-3">
+            {% for req in pending_requests %}
+            <div class="glass-card p-4 rounded-2xl shadow-2xl border-primary-container/30 animate-in slide-in-from-right duration-300">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-full border border-primary-container/20 overflow-hidden">
+                        <img src="{% if req.sender.profile.avatar %}{{ req.sender.profile.avatar.url }}{% else %}{{ req.sender.profile.avatar_url|default:'https://ui-avatars.com/api/?name='|add:req.sender.profile.display_name }}{% endif %}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs font-bold text-primary">{{ req.sender.profile.display_name }}</p>
+                        <p class="text-[10px] text-on-surface-variant">يرغب في التواصل معك</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <a href="{% url 'respond-connection' req.id 'accept' %}" class="flex-1 py-2 bg-primary-container text-on-primary text-[10px] font-bold rounded-lg text-center">قبول</a>
+                    <a href="{% url 'respond-connection' req.id 'reject' %}" class="flex-1 py-2 bg-white/5 text-on-surface-variant text-[10px] font-bold rounded-lg text-center">رفض</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </main>
 
     <!-- BottomNavBar -->

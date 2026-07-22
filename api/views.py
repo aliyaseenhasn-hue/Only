@@ -9,7 +9,7 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 from geopy.geocoders import Nominatim
 
-from .models import UserProfile, ContactHistory, Interest
+from .models import UserProfile, ContactHistory, Interest, ConnectionRequest
 
 
 def authenticate_by_phone_or_username(request, identifier, password):
@@ -50,6 +50,8 @@ def register_screen(request):
 
         if not phone or len(phone) < 10:
             messages.error(request, 'يرجى إدخال رقم هاتف صحيح.')
+        elif not instagram_handle:
+            messages.error(request, 'حساب الانستقرام إلزامي.')
         elif password != password_confirm:
             messages.error(request, 'كلمتا المرور غير متطابقتين.')
         elif len(password) < 6:
@@ -282,6 +284,9 @@ def radar_dashboard(request):
     }
     total_contacts = ContactHistory.objects.filter(user=request.user).count()
 
+    # طلبات الاتصال الواردة
+    pending_requests = ConnectionRequest.objects.filter(receiver=request.user, status='PENDING')
+
     # تحضير بيانات JSON للرادار التفاعلي
     nearby_people_json = json.dumps({
         'people': [
@@ -309,6 +314,7 @@ def radar_dashboard(request):
         'current_location_available': current_location_available,
         'new_found_contacts': new_found_contacts,
         'total_contacts': total_contacts,
+        'pending_requests': pending_requests,
         'nearby_people_json': nearby_people_json,
     })
 
@@ -424,11 +430,43 @@ def user_detail_view(request, user_id):
         distance = haversine_distance(my_profile.latitude, my_profile.longitude, target_profile.latitude, target_profile.longitude)
         direction = direction_name(my_profile.latitude, my_profile.longitude, target_profile.latitude, target_profile.longitude)
 
+    # التحقق من حالة الاتصال
+    connection = ConnectionRequest.objects.filter(sender=request.user, receiver=target_user).first()
+    if not connection:
+        # التحقق إذا كان الطرف الآخر قد أرسل طلباً بالفعل
+        received_connection = ConnectionRequest.objects.filter(sender=target_user, receiver=request.user).first()
+        if received_connection and received_connection.status == 'ACCEPTED':
+            connection = received_connection
+
     return render(request, 'user_profile.html', {
         'target_profile': target_profile,
         'distance': distance,
         'direction': direction,
+        'connection': connection,
     })
+
+
+@login_required(login_url='login-page')
+def send_connection_request(request, user_id):
+    if request.method == 'POST':
+        receiver = User.objects.get(id=user_id)
+        ConnectionRequest.objects.get_or_create(sender=request.user, receiver=receiver)
+        messages.success(request, 'تم إرسال طلب الاتصال بنجاح.')
+    return redirect('user-detail', user_id=user_id)
+
+
+@login_required(login_url='login-page')
+def respond_connection_request(request, request_id, action):
+    conn_request = ConnectionRequest.objects.get(id=request_id, receiver=request.user)
+    if action == 'accept':
+        conn_request.status = 'ACCEPTED'
+        conn_request.save()
+        messages.success(request, 'تم قبول طلب الاتصال.')
+    elif action == 'reject':
+        conn_request.status = 'REJECTED'
+        conn_request.save()
+        messages.info(request, 'تم رفض طلب الاتصال.')
+    return redirect('radar-dashboard')
 
 
 @login_required(login_url='login-page')
